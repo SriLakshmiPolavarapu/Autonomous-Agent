@@ -6,11 +6,18 @@ load_dotenv()
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-# Step 1 - Just test it works (like we did with HuggingFace)
-model = genai.GenerativeModel("models/gemini-2.5-flash")
+# tool calling
+def search_web(query: str) -> dict:
+    """Search the web for the information on a topic."""
+    return{}
 
-response = model.generate_content("Hello, who are you?")
+model = genai.GenerativeModel(
+    model_name="gemini-2.5-flash",
+    tools=[search_web],
+    system_instruction="You are a research agent. When asked about current events or recent information, ALWAYS use the search_web tool. Never answer from memory."
+)
 
-print(response.text)
+response = model.generate_content("Search for the latest trends in edge AI")
 
 
+print(response.candidates[0].content.parts)
