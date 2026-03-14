@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 import google.generativeai as genai
 from ddgs import DDGS
+from google.protobuf.struct_pb2 import Struct
 
 load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
@@ -32,34 +33,32 @@ user_question = input("What do you want to research? ")
 response = chat.send_message(user_question)
 
 
-part = response.candidates[0].content.parts[0]
-
-if hasattr(part, "function_call") and part.function_call.name:
-    function_call = part.function_call
-    query = function_call.args["query"]
-    print(f"Model wants to search for: {query}")
+# adding the loop so that model searches for multiple times
+while True:
+    part = response.candidates[0].content.parts[0]
     
-    search_results = search_web(query)
-    print(f"Successfully got the results!\n")
+    if hasattr(part, "function_call") and part.function_call.name:
+        function_call = part.function_call
+        query = function_call.args["query"]
+        print(f"Model wants to search for: {query}")
+        
+        search_results = search_web(query)
+        print(f"Successfully got the results!\n")
 
-    from google.protobuf.struct_pb2 import Struct
-    
-    response_struct = Struct()
-    response_struct.update({"result": search_results})
+        response_struct = Struct()
+        response_struct.update({"result": search_results})
 
-    response = chat.send_message(
-        genai.protos.Content(
-            parts=[genai.protos.Part(
-                function_response=genai.protos.FunctionResponse(
-                    name="search_web",
-                    response=response_struct
-                )
-            )]
+        response = chat.send_message(
+            genai.protos.Content(
+                parts=[genai.protos.Part(
+                    function_response=genai.protos.FunctionResponse(
+                        name="search_web",
+                        response=response_struct
+                    )
+                )]
+            )
         )
-    )
-
-    print("ANSWER")
-    print(response.text)
-
-else:
-    print(response.text)
+    else:   
+        print("ANSWER")
+        print(response.text)
+        break
