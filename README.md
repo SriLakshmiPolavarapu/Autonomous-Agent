@@ -1,22 +1,3 @@
-1. This agent searches information without needing of any memory. 
-2. It searches the web through tool calling and we get real-time answers
-
-
-Below is the list of free tier google model
-https://aistudio.google.com/rate-limit?timeRange=last-28-days&project=gen-lang-client-0000070878
-
----> libraries used
-1. google.generativeai - for interating with google models
-2. DDGS - DuckDuckGo search library for real-time searching
-
-
----> in the model setup, we have to give the search_web function so Gemini can call it automatically when needed
-
----> to run
-python research_agent.py
-
-
-
 # Autonomous Research Agent
 
 An AI-powered research agent that searches the web and writes informed answers based on real data and not memory.
