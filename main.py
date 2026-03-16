@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 import google.generativeai as genai
-from ddgs import DDGS
+from duckduckgo_search import DDGS
 from google.protobuf.struct_pb2 import Struct
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
