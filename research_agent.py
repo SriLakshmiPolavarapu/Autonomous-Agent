@@ -5,7 +5,7 @@ from ddgs import DDGS
 from google.protobuf.struct_pb2 import Struct
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.response import StreamingResponse
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import json
 
@@ -36,46 +36,61 @@ def search_web(query: str) -> str:
     return output
 
 # model setup
-model = genai.GenerativeModel(
+def make_model():
+    return genai.GenerativeModel(
     model_name="gemini-2.5-flash",
     tools=[search_web],
     system_instruction="You are a research agent. When asked about current events or recent information, ALWAYS use the search_web tool. Never answer from memory."
 )
 
-chat = model.start_chat()
+class QueryRequest(BaseModel):
+    question: str
+
+#chat = model.start_chat()
 # this is the hardcoded question
 #response = chat.send_message("What are the latest trends in edge AI?")
 # user input question
-user_question = input("What do you want to research? ")
-response = chat.send_message(user_question)
+#user_question = input("What do you want to research? ")
+#response = chat.send_message(user_question)
 
-
+@app.post("/research")
+async def research(req: QueryRequest):
+    def event_stream():
+        try:
+            model = make_model()
+            chat = model.start_chat()
+            response = chat.send_message(req.question)
 # adding the loop so that model searches for multiple times
-while True:
-    part = response.candidates[0].content.parts[0]
-    
-    if hasattr(part, "function_call") and part.function_call.name:
-        function_call = part.function_call
-        query = function_call.args["query"]
-        print(f"Model wants to search for: {query}")
-        
-        search_results = search_web(query)
-        print(f"Successfully got the results!\n")
+            while True:
+                part = response.candidates[0].content.parts[0]
+                
+                if hasattr(part, "function_call") and part.function_call.name:
+                    query = part.function_call.args["query"]
+                    yield f"data: {json.dumps({'type': 'search', 'query': query})}\n\n"
 
-        response_struct = Struct()
-        response_struct.update({"result": search_results})
+                    search_results = search_web(query)
+                    response_struct = Struct()
+                    response_struct.update({"result": search_results})
 
-        response = chat.send_message(
-            genai.protos.Content(
-                parts=[genai.protos.Part(
-                    function_response=genai.protos.FunctionResponse(
-                        name="search_web",
-                        response=response_struct
+                    response = chat.send_message(
+                        genai.protos.Content(
+                            parts=[genai.protos.Part(
+                                function_response=genai.protos.FunctionResponse(
+                                    name="search_web",
+                                    response=response_struct,
+                                )
+                            )]
+                        )
                     )
-                )]
-            )
-        )
-    else:   
-        print("ANSWER")
-        print(response.text)
-        break
+                else:
+                    yield f"data: {json.dumps({'type': 'answer', 'text': response.text})}\n\n"
+                    break
+
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
